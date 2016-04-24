@@ -233,16 +233,35 @@ chrome.get("http://www.centris.ca/")
     })
     // Loop on properties
     .then (function () {
-        extractProperty()
-            .then(function () {
-                return chrome.findElements(By.id("divWrapperPager"));
-            })
-            .then(function (elements) {
-                return elements[0].findElements(By.className("next"));
-            })
-            .then(function (elements) {
-                return elements[0].click();
+        var done,
+            promise = new Promise(function (resolve) {
+                done = resolve;
             });
+        function next () {
+            chrome.findElements(By.id("divWrapperPager"))
+                .then(function (elements) {
+                    return elements[0].findElements(By.className("next"));
+                })
+                .then(function (elements) {
+                    var button = elements[0];
+                    button.getAttribute("class")
+                        .then(function (classNames) {
+                            if (-1 < classNames.indexOf("inactive")) {
+                                done();
+                            } else {
+                                button.click()
+                                    .then(function () {
+                                        return wait(1000); // TODO  find a way to wait for the page to be loaded
+                                    })
+                                    .then(function () {
+                                        extractProperty().then(next);
+                                    });
+                            }
+                        });
+                });
+        }
+        extractProperty().then(next);
+        return promise;
     })
     .then(function () {
         console.log("OK");
