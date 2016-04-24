@@ -25,6 +25,8 @@ function wait (time) {
     });
 }
 
+var properties = [];
+
 function extractProperty () {
     var property = {};
     return chrome.getCurrentUrl()
@@ -51,7 +53,7 @@ function extractProperty () {
             property.mapUrl = text.split("('")[1].split("')")[0];
         })
         .then(function () {
-            console.log(JSON.stringify(property));
+            properties.push(property);
         });
 }
 
@@ -237,6 +239,14 @@ chrome.get("http://www.centris.ca/")
             promise = new Promise(function (resolve) {
                 done = resolve;
             });
+        function process () {
+            // Due to synchronization issue, we may have to repeat once the extraction
+            extractProperty()
+                .then(next)
+                .catch(function () {
+                    extractProperty().then(next);
+                });
+        }
         function next () {
             chrome.findElements(By.id("divWrapperPager"))
                 .then(function (elements) {
@@ -251,16 +261,16 @@ chrome.get("http://www.centris.ca/")
                             } else {
                                 button.click()
                                     .then(function () {
-                                        return wait(1000); // TODO  find a way to wait for the page to be loaded
+                                        return wait(250);
                                     })
                                     .then(function () {
-                                        extractProperty().then(next);
+                                        process();
                                     });
                             }
                         });
                 });
         }
-        extractProperty().then(next);
+        process();
         return promise;
     })
     .then(function () {
