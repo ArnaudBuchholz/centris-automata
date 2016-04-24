@@ -20,6 +20,7 @@
     "grunt-cli": "^0.1.13",
     "grunt-eslint": "^17.2.0",
     "grunt-notify": "^0.4.3",
+    "selenium-webdriver": "^2.53.1",
     "time-grunt": "^1.2.2"
   }
 }
