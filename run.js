@@ -6,14 +6,9 @@ var fs = require("fs"),
     until = require("selenium-webdriver").until,
     chrome = new webDriver.Builder()
         .forBrowser("chrome")
-        .build();
-
-var SEARCH_TOWN = "Montréal",
-    SEARCH_TOWN_SUB = "Tous les arrondissements",
-    MAX_PRICE = 600000,
-    HOUSE_TYPES = ["Maison unifamiliale"],
-    ROOMS_TYPE = "2+"
-;
+        .build(),
+    configName = process.argv[2] || "config",
+    config = JSON.parse(fs.readFileSync("tmp/" + configName + ".json").toString());
 
 function verbose(text) {
     console.log(text);
@@ -25,7 +20,7 @@ function wait (time) {
     });
 }
 
-var properties = [];
+fs.writeFileSync("tmp/" + configName + ".csv", "URL,PRICE,GOOGLE\r\n", "utf8");
 
 function extractProperty () {
     var property = {};
@@ -53,7 +48,11 @@ function extractProperty () {
             property.mapUrl = text.split("('")[1].split("')")[0];
         })
         .then(function () {
-            properties.push(property);
+            fs.appendFileSync("tmp/" + configName + ".csv", "\"" + [
+                property.url,
+                property.price,
+                property.mapUrl
+            ].join("\",\"") + "\"\r\n", "utf8");
         });
 }
 
@@ -64,8 +63,8 @@ chrome.get("http://www.centris.ca/")
         verbose("Locating search control");
         return chrome.findElements(By.id("search"))
             .then(function (elements) {
-                verbose("Typing '" + SEARCH_TOWN + "'");
-                return elements[0].sendKeys(SEARCH_TOWN);
+                verbose("Typing '" + config.search.town + "'");
+                return elements[0].sendKeys(config.search.town);
             })
             .then(function () {
                 verbose("Wait 1 second for autocomplete to appear");
@@ -89,7 +88,7 @@ chrome.get("http://www.centris.ca/")
                     .then(function (texts) {
                         texts.every(function (text, index) {
                             verbose(">> " + text);
-                            if (-1 < text.indexOf(SEARCH_TOWN_SUB)) {
+                            if (-1 < text.indexOf(config.search.suburb)) {
                                 selectedIndex = index;
                                 return false;
                             }
@@ -97,7 +96,7 @@ chrome.get("http://www.centris.ca/")
                         });
                         verbose("Selecting index " + selectedIndex);
                         if (undefined === selectedIndex) {
-                            return Promise.reject("Unable to locate '" + SEARCH_TOWN_SUB + "'");
+                            return Promise.reject("Unable to locate '" + config.search.suburb + "'");
                         }
                         return elements[selectedIndex].click();
                     });
@@ -134,7 +133,7 @@ chrome.get("http://www.centris.ca/")
                 function processPrice (price) {
                     price = parseInt(price, 10);
                     console.log(">> " + price);
-                    if (price <= MAX_PRICE) {
+                    if (price <= config.search["max-price"]) {
                         done();
                     } else {
                         moveLeft().then(processPrice);
@@ -170,7 +169,7 @@ chrome.get("http://www.centris.ca/")
                         var clicked = [];
                         texts.forEach(function (text, index) {
                             verbose(">> " + text);
-                            if (-1 < HOUSE_TYPES.indexOf(text)) {
+                            if (-1 < config.search["house-types"].indexOf(text)) {
                                 clicked.push(elements[index].click());
                             }
                         });
@@ -201,7 +200,7 @@ chrome.get("http://www.centris.ca/")
                             .then(function (texts) {
                                 texts.every(function (text, index) {
                                     verbose(">> " + text);
-                                    if (ROOMS_TYPE === text) {
+                                    if (config.search["room-type"] === text) {
                                         selectedIndex = index;
                                         return false;
                                     }
@@ -209,7 +208,7 @@ chrome.get("http://www.centris.ca/")
                                 });
                                 verbose("Selecting index " + selectedIndex);
                                 if (undefined === selectedIndex) {
-                                    return Promise.reject("Unable to locate '" + ROOMS_TYPE + "'");
+                                    return Promise.reject("Unable to locate '" + config.search["room-type"] + "'");
                                 }
                                 return elements[selectedIndex].click();
                             });
