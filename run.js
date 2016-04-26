@@ -8,7 +8,15 @@ var fs = require("fs"),
         .forBrowser("chrome")
         .build(),
     configName = process.argv[2] || "config",
-    config = JSON.parse(fs.readFileSync("tmp/" + configName + ".json").toString());
+    config = JSON.parse(fs.readFileSync("tmp/" + configName + ".json").toString()),
+    GoogleMapsAPI = require("googlemaps"),
+    publicConfig = {
+        key: config["google-api-key"],
+        stagger_time:       1000, // for elevationPath
+        encode_polylines:   false,
+        secure:             true // use https
+    },
+    gmAPI = new GoogleMapsAPI(publicConfig);
 
 function verbose(text) {
     console.log(text);
