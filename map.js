@@ -10,7 +10,7 @@ var fs = require("fs"),
     },
     gmAPI = new GoogleMapsAPI(publicConfig);
 gmAPI.directions({
-    origin: "45.462942, -73.649336", // "45.495324, -73.653786", //
+    origin: "45.476335, -73.607611", // "45.495324, -73.653786", //
     destination: "Collège international Marie de France, 4635 Chemin Queen Mary, Montréal, QC H3W 1W3",
     mode: "transit",
     alternatives: true,
@@ -41,8 +41,11 @@ gmAPI.directions({
             route.legs[0].steps.forEach(function (step, index, steps) {
                 var msg = [">> ", step.travel_mode];
                 if (step.travel_mode === "TRANSIT") {
-                    if (1 === index && "SUBWAY" === step.transit_details.line.vehicle.type) {
-                        var walkDistance = steps[index - 1].duration.value;
+                    if (2 > index && "SUBWAY" === step.transit_details.line.vehicle.type) {
+                        var walkDistance = 0;
+                        if (1 === index) {
+                            walkDistance = steps[0].duration.value;
+                        }
                         if (walkDistance < subwayWalkDistance) {
                             subwayWalkDistance = walkDistance;
                             subwayStation = transitName(step.transit_details);
