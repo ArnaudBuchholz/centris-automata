@@ -16,7 +16,8 @@ var fs = require("fs"),
         encode_polylines:   false,
         secure:             true // use https
     },
-    gmAPI = new GoogleMapsAPI(publicConfig);
+    gmAPI = new GoogleMapsAPI(publicConfig),
+    checkTransit = require("./checkTransit.js");
 
 function verbose(text) {
     console.log(text);
@@ -28,7 +29,13 @@ function wait (time) {
     });
 }
 
-fs.writeFileSync("tmp/" + configName + ".csv", "URL,PRICE,GOOGLE\r\n", "utf8");
+fs.writeFileSync("tmp/" + configName + ".csv", [
+    "URL,PRICE,GOOGLE",
+    "MIN_CIMF,MEAN_CIMF,MAX_CIMF",
+    "SUBWAY,SUBWAY_STATION,SUBWAY_DISTANCE",
+    "BUS,BUS_DISTANCE,BUS_EXPRESS",
+    "\r\n"
+].join(","), "utf8");
 
 function extractProperty () {
     var property = {};
@@ -54,12 +61,31 @@ function extractProperty () {
         })
         .then(function (text) {
             property.mapUrl = text.split("('")[1].split("')")[0];
+            var fromGPS = property.mapUrl.split("&q=")[1];
+            console.log(fromGPS);
+            // Extract GPS pos after &q= and check public transportation
+            return checkTransit({
+                from: fromGPS,
+                to: "Collège international Marie de France, 4635 Chemin Queen Mary, Montréal, QC H3W 1W3",
+                when: new Date(2016, 3, 25, 7, 0, 0), // 7:00 AM
+                verbose: true
+            });
         })
-        .then(function () {
+        .then(function (transit) {
             fs.appendFileSync("tmp/" + configName + ".csv", "\"" + [
                 property.url,
                 property.price,
-                property.mapUrl
+                property.mapUrl,
+                transit.minDuration,
+                transit.meanDuration,
+                transit.maxDuration,
+                transit.subway.name,
+                transit.subway.station,
+                transit.subway.walkDuration || 0,
+                transit.bus.name,
+                transit.bus.walkDuration || 0,
+                transit.bus.fast.toString()
+
             ].join("\",\"") + "\"\r\n", "utf8");
         });
 }
