@@ -9,15 +9,7 @@ var fs = require("fs"),
         .build(),
     configName = process.argv[2] || "config",
     config = JSON.parse(fs.readFileSync("tmp/" + configName + ".json").toString()),
-    GoogleMapsAPI = require("googlemaps"),
-    publicConfig = {
-        key: config["google-api-key"],
-        stagger_time:       1000, // for elevationPath
-        encode_polylines:   false,
-        secure:             true // use https
-    },
-    gmAPI = new GoogleMapsAPI(publicConfig),
-    checkTransit = require("./checkTransit.js");
+    db = require("./csvdb.js");
 
 function verbose(text) {
     console.log(text);
@@ -29,19 +21,12 @@ function wait (time) {
     });
 }
 
-fs.writeFileSync("tmp/" + configName + ".csv", [
-    "URL,PRICE,GOOGLE",
-    "MIN_CIMF,MEAN_CIMF,MAX_CIMF",
-    "SUBWAY,SUBWAY_STATION,SUBWAY_DISTANCE",
-    "BUS,BUS_DISTANCE,BUS_EXPRESS",
-    "\r\n"
-].join(","), "utf8");
-
 function extractProperty () {
     var property = {};
     return chrome.getCurrentUrl()
         .then(function (url) {
             property.url = url;
+            property.id = url.split("/").pop().split("?")[0];
             return chrome.findElements(By.id("BuyPrice"));
         })
         .then(function (elements) {
@@ -61,44 +46,24 @@ function extractProperty () {
         })
         .then(function (text) {
             property.mapUrl = text.split("('")[1].split("')")[0];
-            var fromGPS = property.mapUrl.split("&q=")[1];
-            console.log(fromGPS);
-            // Extract GPS pos after &q= and check public transportation
-            return checkTransit({
-                from: fromGPS,
-                to: "Collège international Marie de France, 4635 Chemin Queen Mary, Montréal, QC H3W 1W3",
-                when: new Date(2016, 3, 25, 7, 0, 0), // 7:00 AM
-                verbose: true
-            });
+            return db.add(property);
         })
-        .then(function (transit) {
-            fs.appendFileSync("tmp/" + configName + ".csv", "\"" + [
-                property.url,
-                property.price,
-                property.mapUrl,
-                transit.minDuration,
-                transit.meanDuration,
-                transit.maxDuration,
-                transit.subway.name,
-                transit.subway.station,
-                transit.subway.walkDuration || 0,
-                transit.bus.name,
-                transit.bus.walkDuration || 0,
-                transit.bus.fast.toString()
-
-            ].join("\",\"") + "\"\r\n", "utf8");
-        });
+    ;
 }
 
-verbose("Opening website");
-chrome.get("http://www.centris.ca/")
+verbose("Opening database");
+db.init("centris")
+    .then(function () {
+        verbose("Opening website");
+        return chrome.get("http://www.centris.ca/");
+    })
     // Process search field
     .then(function () {
         verbose("Locating search control");
         return chrome.findElements(By.id("search"))
             .then(function (elements) {
-                verbose("Typing '" + config.search.town + "'");
-                return elements[0].sendKeys(config.search.town);
+                verbose("Typing '" + config.search.centris.town + "'");
+                return elements[0].sendKeys(config.search.centris.town);
             })
             .then(function () {
                 verbose("Wait 1 second for autocomplete to appear");
@@ -122,7 +87,7 @@ chrome.get("http://www.centris.ca/")
                     .then(function (texts) {
                         texts.every(function (text, index) {
                             verbose(">> " + text);
-                            if (-1 < text.indexOf(config.search.suburb)) {
+                            if (-1 < text.indexOf(config.search.centris.suburb)) {
                                 selectedIndex = index;
                                 return false;
                             }
@@ -130,7 +95,7 @@ chrome.get("http://www.centris.ca/")
                         });
                         verbose("Selecting index " + selectedIndex);
                         if (undefined === selectedIndex) {
-                            return Promise.reject("Unable to locate '" + config.search.suburb + "'");
+                            return Promise.reject("Unable to locate '" + config.search.centris.suburb + "'");
                         }
                         return elements[selectedIndex].click();
                     });
@@ -167,7 +132,7 @@ chrome.get("http://www.centris.ca/")
                 function processPrice (price) {
                     price = parseInt(price, 10);
                     console.log(">> " + price);
-                    if (price <= config.search["max-price"]) {
+                    if (price <= config.search.centris["max-price"]) {
                         done();
                     } else {
                         moveLeft().then(processPrice);
@@ -203,7 +168,7 @@ chrome.get("http://www.centris.ca/")
                         var clicked = [];
                         texts.forEach(function (text, index) {
                             verbose(">> " + text);
-                            if (-1 < config.search["house-types"].indexOf(text)) {
+                            if (-1 < config.search.centris["house-types"].indexOf(text)) {
                                 clicked.push(elements[index].click());
                             }
                         });
@@ -234,7 +199,7 @@ chrome.get("http://www.centris.ca/")
                             .then(function (texts) {
                                 texts.every(function (text, index) {
                                     verbose(">> " + text);
-                                    if (config.search["room-type"] === text) {
+                                    if (config.search.centris["room-type"] === text) {
                                         selectedIndex = index;
                                         return false;
                                     }
@@ -242,7 +207,7 @@ chrome.get("http://www.centris.ca/")
                                 });
                                 verbose("Selecting index " + selectedIndex);
                                 if (undefined === selectedIndex) {
-                                    return Promise.reject("Unable to locate '" + config.search["room-type"] + "'");
+                                    return Promise.reject("Unable to locate '" + config.search.centris["room-type"] + "'");
                                 }
                                 return elements[selectedIndex].click();
                             });
