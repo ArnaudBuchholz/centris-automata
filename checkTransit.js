@@ -1,3 +1,5 @@
+"use strict";
+
 var fs = require("fs"),
     configName = process.argv[2] || "config",
     config = JSON.parse(fs.readFileSync("tmp/" + configName + ".json").toString()),
