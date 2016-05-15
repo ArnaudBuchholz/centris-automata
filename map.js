@@ -1,7 +1,7 @@
 require("./checkTransit.js")({
-    from: process.argv[3],
+    from: process.argv[3] + ", Montréal, QC",
     to: "Collège international Marie de France, 4635 Chemin Queen Mary, Montréal, QC H3W 1W3",
-    when: new Date(2016, 3, 25, 7, 0, 0),
+    when: new Date(2016, 4, 3, 7, 0, 0),
     verbose: true
 
 }).then(function (res) {
